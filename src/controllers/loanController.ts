@@ -1,42 +1,35 @@
 import type {Request, Response} from 'express';
-import type {CreateLoanDTO} from '../schemas/loanSchema';
 import {loanService} from '../services/loanService';
-import {userService} from '../services/userService';
 import {bookService} from '../services/bookService';
+import type {CreateLoanDTO} from '../schemas/loanSchema';
 
-export function getAllLoans(_: Request, res: Response) {
-  res.status(200).json(loanService.findAll());
+export async function getAllLoans(req: Request, res: Response) {
+  const loans =
+    req.user!.role === 'ADMIN'
+      ? await loanService.findAll()
+      : await loanService.findByUser(req.user!.id);
+  res.status(200).json(loans);
 }
 
-export function loanBook(req: Request<{}, {}, CreateLoanDTO>, res: Response) {
-  const user = userService.findById(req.body.userId);
-  if (!user) {
-    return res.status(404).json({error: 'User not found'});
-  }
-  const book = bookService.findById(req.body.bookId);
-  if (!book) {
-    return res.status(404).json({error: 'Book not found'});
-  }
-  if (!book.available) {
-    return res.status(400).json({error: 'Book is not available for lending'});
-  }
-  const loan = loanService.loan(req.body);
-  bookService.setAvailable(book, false);
+export async function loanBook(req: Request<{}, {}, CreateLoanDTO>, res: Response) {
+  const book = await bookService.findById(req.body.bookId);
+  if (!book) return res.status(404).json({error: 'Book not found'});
+  if (!book.available) return res.status(400).json({error: 'Book is not available for lending'});
+
+  await bookService.setAvailable(book.id, false);
+  const loan = await loanService.create(req.user!.id, req.body.bookId);
   res.status(201).json(loan);
 }
 
-export function returnBook(req: Request<{ id: string; }>, res: Response) {
-  const loan = loanService.findById(req.params.id);
-  if (!loan) {
-    return res.status(404).json({error: 'Loan not found'});
+export async function returnBook(req: Request<{ id: string }>, res: Response) {
+  const loan = await loanService.findById(req.params.id);
+  if (!loan) return res.status(404).json({error: 'Loan not found'});
+  if (loan.status === 'RETURNED') return res.status(400).json({error: 'Book is already returned'});
+
+  if (req.user!.role !== 'ADMIN' && loan.userId !== req.user!.id) {
+    return res.status(403).json({error: 'Forbidden: this is not your loan'});
   }
-  if (loan.status === 'RETURNED') {
-    return res.status(400).json({error: 'Book is already returned'});
-  }
-  const book = bookService.findById(loan.bookId);
-  if (!book) {
-    return res.status(404).json({error: 'Book not found'});
-  }
-  bookService.setAvailable(book, true);
-  res.status(200).json(loanService.return(loan));
+
+  await bookService.setAvailable(loan.bookId, true);
+  res.status(200).json(await loanService.returnLoan(loan.id));
 }

@@ -1,2 +1,7 @@
 .idea/
 node_modules/
+.env
+*.db
+*.db-journal
+*.db-wal
+*.db-shm

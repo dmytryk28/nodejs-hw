@@ -1,13 +1,13 @@
-import express from 'express';
-import {validate} from '../middleware/validate';
-import {userSchema} from '../schemas/userSchema';
+import {Router} from 'express';
+import {authenticate} from '../middleware/auth';
+import {requireRole} from '../middleware/role';
 import * as UserController from '../controllers/userController';
 
-const router = express.Router()
-const jsonParser = express.json();
+const router = Router();
+const adminOnly = [authenticate, requireRole('ADMIN')] as const;
 
-router.get('/', UserController.getAllUsers);
-router.get('/:id', UserController.getUserById);
-router.post('/', jsonParser, validate(userSchema), UserController.createUser);
+router.get('/me', authenticate, UserController.getMe);
+router.get('/', ...adminOnly, UserController.getAllUsers);
+router.get('/:id', ...adminOnly, UserController.getUserById);
 
 export default router;

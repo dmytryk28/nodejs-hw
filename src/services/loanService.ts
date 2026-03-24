@@ -1,36 +1,29 @@
-import {db} from '../storage/db';
-import type {Loan} from '../types/loan';
-import type {CreateLoanDTO} from '../schemas/loanSchema';
+import prisma from '../db/prisma';
 
 class LoanService {
-  findAll(): Loan[] {
-    return db.loans.getAll();
+  findAll() {
+    return prisma.loan.findMany({include: {book: true, user: false}});
   }
 
-  findById(id: string): Loan | undefined {
-    return db.loans.getById(id);
+  findByUser(userId: string) {
+    return prisma.loan.findMany({where: {userId}});
   }
 
-  loan(dto: CreateLoanDTO): Loan {
-    const loan: Loan = {
-      ...dto,
-      id: crypto.randomUUID(),
-      loanDate: new Date(),
-      returnDate: null,
-      status: 'ACTIVE'
-    }
-    db.loans.save(loan);
-    return loan;
+  findById(id: string) {
+    return prisma.loan.findUnique({where: {id}});
   }
 
-  return(loan: Loan): Loan {
-    const updatedLoan: Loan = {
-      ...loan,
-      returnDate: new Date(),
-      status: 'RETURNED'
-    }
-    db.loans.save(updatedLoan);
-    return updatedLoan;
+  create(userId: string, bookId: string) {
+    return prisma.loan.create({
+      data: {userId, bookId},
+    });
+  }
+
+  returnLoan(id: string) {
+    return prisma.loan.update({
+      where: {id},
+      data: {returnDate: new Date(), status: 'RETURNED'},
+    });
   }
 }
 
