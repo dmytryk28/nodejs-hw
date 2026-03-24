@@ -1,50 +1,35 @@
-import {db} from '../storage/db';
+import prisma from '../db/prisma';
 import type {CreateBookDTO, UpdateBookDTO} from '../schemas/bookSchema';
-import type {Book} from '../types/book';
 
 class BookService {
-  findAll(): Book[] {
-    return db.books.getAll();
+  findAll() {
+    return prisma.book.findMany();
   }
 
-  findById(id: string): Book | undefined {
-    return db.books.getById(id);
+  findById(id: string) {
+    return prisma.book.findUnique({where: {id}});
   }
 
-  existsId(id: string): boolean {
-    return db.books.getById(id) !== undefined;
+  async existsIsbn(isbn: string, excludeId?: string) {
+    const book = await prisma.book.findUnique({where: {isbn}});
+    if (!book) return false;
+    return book.id !== excludeId;
   }
 
-  setAvailable(book: Book, available: boolean): Book {
-    const updatedBook: Book = {
-      ...book,
-      available
-    }
-    db.books.save(updatedBook);
-    return updatedBook;
+  create(dto: CreateBookDTO) {
+    return prisma.book.create({data: dto});
   }
 
-  create(dto: CreateBookDTO): Book {
-    const book: Book = {
-      id: crypto.randomUUID(),
-      ...dto
-    }
-    db.books.save(book);
-    return book;
+  update(id: string, dto: UpdateBookDTO) {
+    return prisma.book.update({where: {id}, data: dto});
   }
 
-  update(id: string, dto: UpdateBookDTO): Book {
-    const book = db.books.getById(id)!;
-    const updatedBook: Book = {
-      ...book,
-      ...dto
-    }
-    db.books.save(updatedBook);
-    return updatedBook;
+  setAvailable(id: string, available: boolean) {
+    return prisma.book.update({where: {id}, data: {available}});
   }
 
-  delete(id: string): boolean {
-    return db.books.delete(id);
+  delete(id: string) {
+    return prisma.book.delete({where: {id}});
   }
 }
 

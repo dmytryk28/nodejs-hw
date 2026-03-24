@@ -1,28 +1,22 @@
-import {db} from '../storage/db';
-import type {User} from '../types/user';
-import type {UserDto} from '../schemas/userSchema';
+import prisma from '../db/prisma';
+
+function omitPasswordHash<T extends { passwordHash: string }>(
+  user: T
+): Omit<T, 'passwordHash'> {
+  const {passwordHash: _, ...safe} = user;
+  return safe;
+}
 
 class UserService {
-
-  findById(id: string): User | undefined {
-    return db.users.getById(id);
+  async findAll() {
+    const users = await prisma.user.findMany();
+    return users.map(omitPasswordHash);
   }
 
-  findAll(): User[] {
-    return db.users.getAll();
-  }
-
-  create(dto: UserDto): User {
-    const user: User = {
-      id: crypto.randomUUID(),
-      ...dto
-    }
-    db.users.save(user);
-    return user;
-  }
-
-  existsEmail(email: string): boolean {
-    return db.users.getAll().some(user => user.email === email);
+  async findById(id: string) {
+    const user = await prisma.user.findUnique({where: {id}});
+    if (!user) return null;
+    return omitPasswordHash(user);
   }
 }
 
