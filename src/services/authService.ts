@@ -2,7 +2,8 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import prisma from '../db/prisma';
-import type {RegisterDTO, LoginDTO} from '../schemas/authSchema';
+import type {RegisterDTO, LoginDTO, RequestPasswordResetDTO, ResetPasswordDTO} from '../schemas/authSchema';
+import {sendPasswordResetEmail} from '../utils/sendMail';
 
 const SALT_ROUNDS = 12;
 
@@ -86,6 +87,36 @@ class AuthService {
 
   async logout(token: string) {
     await prisma.refreshToken.deleteMany({where: {token}});
+  }
+
+  // stateless
+  async requestPasswordReset(dto: RequestPasswordResetDTO) {
+    const user = await prisma.user.findUnique({where: {email: dto.email}});
+    if (!user) {
+      return;
+    }
+    const resetToken = jwt.sign(
+      {email: user.email},
+      process.env.PASSWORD_RESET_SECRET!,
+      {expiresIn: process.env.PASSWORD_RESET_EXPIRES_IN ?? '10m'} as jwt.SignOptions,
+    );
+    await sendPasswordResetEmail(user.email, resetToken);
+  }
+
+  async resetPassword(dto: ResetPasswordDTO) {
+    let email: string;
+    try {
+      const payload = jwt.verify(dto.token, process.env.PASSWORD_RESET_SECRET!) as { email: string };
+      email = payload.email;
+    } catch {
+      throw {status: 400, message: 'Invalid or expired reset token'};
+    }
+    const user = await prisma.user.findUnique({where: {email}});
+    if (!user) {
+      throw {status: 400, message: 'Invalid or expired reset token'};
+    }
+    const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
+    await prisma.user.update({where: {id: user.id}, data: {passwordHash}});
   }
 }
 

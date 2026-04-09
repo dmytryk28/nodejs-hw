@@ -1,6 +1,6 @@
 import type {Request, Response} from 'express';
 import {authService} from '../services/authService';
-import type {RegisterDTO, LoginDTO, RefreshDTO} from '../schemas/authSchema';
+import type {RegisterDTO, LoginDTO, RefreshDTO, RequestPasswordResetDTO, ResetPasswordDTO} from '../schemas/authSchema';
 
 export async function register(req: Request<{}, {}, RegisterDTO>, res: Response) {
   try {
@@ -36,4 +36,30 @@ export async function logout(req: Request<{}, {}, RefreshDTO>, res: Response) {
     // ignore
   }
   res.status(204).send();
+}
+
+export async function requestPasswordReset(
+  req: Request<{}, {}, RequestPasswordResetDTO>,
+  res: Response
+) {
+  try {
+    await authService.requestPasswordReset(req.body);
+  } catch {
+    // ignore
+  }
+  res.status(200).json({
+    message: 'Якщо вказаний email зареєстрований, лист з інструкціями надіслано.',
+  });
+}
+
+export async function resetPassword(
+  req: Request<{}, {}, ResetPasswordDTO>,
+  res: Response
+) {
+  try {
+    await authService.resetPassword(req.body);
+    res.status(200).json({message: 'Пароль успішно змінено.'});
+  } catch (err: any) {
+    res.status(err.status ?? 500).json({error: err.message ?? 'Internal server error'});
+  }
 }
